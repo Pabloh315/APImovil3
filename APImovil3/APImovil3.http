@@ -1,0 +1,6 @@
+@APImovil3_HostAddress = http://localhost:5285
+
+GET {{APImovil3_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
