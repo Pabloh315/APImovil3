@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using APImovil3.Models;
 
 namespace APImovil3.Data;
@@ -8,11 +9,21 @@ namespace APImovil3.Data;
 /// </summary>
 public class AppDbContext : DbContext
 {
+    private readonly IConfiguration? _configuration;
+
     /// <summary>
     /// Constructor que recibe las opciones de configuración
     /// </summary>
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
+    }
+
+    /// <summary>
+    /// Constructor alternativo con IConfiguration para OnConfiguring
+    /// </summary>
+    public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration) : base(options)
+    {
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -24,6 +35,32 @@ public class AppDbContext : DbContext
     /// DbSet para la entidad User
     /// </summary>
     public DbSet<User> Users { get; set; }
+
+    /// <summary>
+    /// Configuración de la conexión con retry strategy para SOMEe
+    /// Se ejecuta solo si las opciones no están configuradas (fallback)
+    /// </summary>
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured && _configuration != null)
+        {
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            if (!string.IsNullOrEmpty(connectionString))
+            {
+                optionsBuilder.UseSqlServer(
+                    connectionString,
+                    sqlOptions =>
+                    {
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 10,
+                            maxRetryDelay: TimeSpan.FromSeconds(10),
+                            errorNumbersToAdd: null
+                        );
+                    }
+                );
+            }
+        }
+    }
 
     /// <summary>
     /// Configuración del modelo de datos

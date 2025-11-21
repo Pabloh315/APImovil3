@@ -53,10 +53,17 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// Configuración de Entity Framework Core con SQL Server
+// Configuración de Entity Framework Core con SQL Server y retry strategy para SOMEe
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 10,
+            maxRetryDelay: TimeSpan.FromSeconds(10),
+            errorNumbersToAdd: null
+        );
+    }));
 
 // Configuración de JWT
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
@@ -104,12 +111,18 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 var app = builder.Build();
 
 // Configuración del pipeline HTTP
-// Swagger siempre habilitado para Railway
-app.UseSwagger();
-app.UseSwaggerUI(c =>
+// Swagger solo en desarrollo
+if (app.Environment.IsDevelopment())
 {
-    c.SwaggerEndpoint("/swagger/v1/swagger.json", "APImovil3 API v1");
-});
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "APImovil3 API v1");
+    });
+}
+
+// NO usar HTTPS Redirection en Railway (no lo soporta)
+// app.UseHttpsRedirection();
 
 // Habilitar CORS
 app.UseCors("AllowAll");
@@ -121,24 +134,12 @@ app.UseAuthorization();
 // Mapeo de controladores
 app.MapControllers();
 
-// Crear la base de datos si no existe (solo en desarrollo)
-if (app.Environment.IsDevelopment())
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        try
-        {
-            dbContext.Database.EnsureCreated();
-        }
-        catch (Exception ex)
-        {
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            logger.LogError(ex, "Error al crear la base de datos");
-        }
-    }
-}
+// NO ejecutar EnsureCreated() en producción - usar migraciones
+// La base de datos debe crearse manualmente o con migraciones
+
+// Configuración de puerto para Railway
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 app.Urls.Add($"http://0.0.0.0:{port}");
+
 app.Run();
 
