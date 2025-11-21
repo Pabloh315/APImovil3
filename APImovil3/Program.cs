@@ -9,6 +9,10 @@ using APImovil3.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configuración de logging para Railway
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+
 // Configuración de servicios
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -100,16 +104,12 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 var app = builder.Build();
 
 // Configuración del pipeline HTTP
-if (app.Environment.IsDevelopment())
+// Swagger siempre habilitado para Railway
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "APImovil3 API v1");
-    });
-}
-
-app.UseHttpsRedirection();
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "APImovil3 API v1");
+});
 
 // Habilitar CORS
 app.UseCors("AllowAll");
@@ -138,5 +138,7 @@ if (app.Environment.IsDevelopment())
         }
     }
 }
-
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+app.Urls.Add($"http://0.0.0.0:{port}");
 app.Run();
+
